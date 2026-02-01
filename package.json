@@ -1,7 +1,19 @@
 {
+  "homepage": "https://RashadNazer.github.io/yi-minutes-app",
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "lucide-react": "^0.563.0",
     "react-mobile-picker": "^1.2.0"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d out"
   }
 }
