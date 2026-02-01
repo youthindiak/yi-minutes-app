@@ -23,26 +23,37 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Fixes the "Missing publishableKey" build error
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  if (!publishableKey) {
+    throw new Error("Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY in environment variables");
+  }
+
   return (
-    <ClerkProvider>
+    <ClerkProvider publishableKey={publishableKey}>
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          {/* Header with Login/Logout logic */}
           <header className="flex justify-between items-center p-4 border-b bg-white">
-            <h1 className="font-bold text-lg">YI Minutes</h1>
+            <h1 className="font-bold text-lg text-blue-600">YI Minutes</h1>
             <div>
               <SignedOut>
                 <SignInButton mode="modal">
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">Login</button>
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    Login
+                  </button>
                 </SignInButton>
               </SignedOut>
               <SignedIn>
-                <UserButton showName />
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">Authorized User</span>
+                  <UserButton showName />
+                </div>
               </SignedIn>
             </div>
           </header>
 
-          <main>{children}</main>
+          <main className="min-h-screen bg-gray-50">{children}</main>
         </body>
       </html>
     </ClerkProvider>
