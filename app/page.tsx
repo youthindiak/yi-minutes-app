@@ -1,13 +1,22 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
-import { Plus, Trash2, Clock, MessageSquare, CheckCircle2, FileText, ArrowRight, UserPlus, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Clock, MessageSquare, CheckCircle2, FileText, ArrowRight, UserPlus, X, Loader2, Lock, ShieldCheck } from 'lucide-react';
 import { PRESET_NAMES } from '../src/data/members';
+
+// --- CONFIGURATION ---
+const AUTHORIZED_KEY = "YIMarwa@2026"; // Change this to your preferred code
 
 const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 
 export default function MinutesApp() {
+  // Authorization State
+  const [passcode, setPasscode] = useState('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authError, setAuthError] = useState(false);
+
+  // Form States
   const [location, setLocation] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState({ h: '10', m: '00', p: 'AM' });
@@ -21,6 +30,25 @@ export default function MinutesApp() {
   ]);
   const [topics, setTopics] = useState(['']);
   const [decisions, setDecisions] = useState(['']);
+
+  // Check for existing session
+  useEffect(() => {
+    const savedAuth = localStorage.getItem('yi_minutes_auth');
+    if (savedAuth === AUTHORIZED_KEY) {
+      setIsAuthorized(true);
+    }
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcode === AUTHORIZED_KEY) {
+      setIsAuthorized(true);
+      localStorage.setItem('yi_minutes_auth', AUTHORIZED_KEY);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+    }
+  };
 
   useEffect(() => {
     setAgendaItems(prev => {
@@ -66,9 +94,7 @@ export default function MinutesApp() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
 
-    // 1. Logo
     try {
-      // Using 'NONE' for original resolution as discussed
       doc.addImage("/YI-logo.jpeg", "JPEG", centerX - 15, 15, 30, 30, undefined, 'NONE');
     } catch (e) {
       doc.setFontSize(22);
@@ -95,7 +121,6 @@ export default function MinutesApp() {
     doc.text(`Location: ${location || 'N/A'}  |  Date: ${date || 'N/A'}  |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
 
     let y = 90;
-
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -137,10 +162,8 @@ export default function MinutesApp() {
     doc.setFont("helvetica", "normal");
     decisions.forEach(d => { if(d) { doc.text(`• ${d}`, 25, y); y += 6; }});
 
-    // Save locally
     doc.save(`YI_Khobar_Marwa_Minutes_${date || 'Meeting'}.pdf`);
 
-    // --- Sync to Google Apps Script ---
     try {
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       const payload = {
@@ -156,7 +179,7 @@ export default function MinutesApp() {
 
       await fetch('https://script.google.com/macros/s/AKfycbyGJkZoZg_seDRotE0AEMsY7EVa28sir-rjmOOe6l4xU40A2wV6kNYZJAWlXeK6jvqAUw/exec', {
         method: 'POST',
-        mode: 'no-cors', // Essential for Google Apps Script
+        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -184,27 +207,65 @@ export default function MinutesApp() {
     </div>
   );
 
+  // --- LOGIN UI ---
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 md:p-12 border border-gray-100 text-center">
+          <div className="w-20 h-20 bg-blue-50 mx-auto rounded-3xl flex items-center justify-center mb-6">
+            <Lock className="text-blue-600" size={40} />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">YI MINUTES</h1>
+          <p className="text-gray-500 text-sm mb-8 font-medium">Please enter the authorization code to access the Marwa Circle Minutes App.</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input 
+              type="password"
+              placeholder="Authorization Code"
+              className={`w-full bg-gray-50 border ${authError ? 'border-red-500' : 'border-gray-200'} rounded-2xl px-6 py-4 text-center text-xl tracking-[0.5em] font-bold focus:ring-4 focus:ring-blue-100 outline-none transition-all`}
+              value={passcode}
+              onChange={(e) => setPasscode(e.target.value)}
+            />
+            {authError && <p className="text-red-500 text-xs font-bold uppercase tracking-wider">Incorrect Secret Code</p>}
+            <button 
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <ShieldCheck size={20} /> Access App
+            </button>
+          </form>
+          <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">Authorized Personnel Only</p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN APP UI ---
   return (
     <main className="p-4 md:p-10 bg-slate-50 min-h-screen font-sans text-gray-800">
       <div className="max-w-5xl mx-auto bg-white p-6 md:p-12 rounded-[2.5rem] shadow-2xl border border-gray-100">
         
         {/* Header */}
-        <div className="flex items-center gap-6 border-b pb-8 mb-8">
-          <div className="w-20 h-20 bg-white flex items-center justify-center rounded-2xl shadow-lg border-4 border-white overflow-hidden shrink-0">
-            <img 
-              src="/YI-logo.jpeg" 
-              alt="YI Logo" 
-              className="object-contain w-full h-full" 
-              onError={(e) => { 
-                e.currentTarget.style.display = 'none'; 
-                e.currentTarget.parentElement!.innerHTML = '<span class="text-blue-600 font-black text-2xl tracking-tighter">YI</span>'; 
-              }} 
-            />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Youth India Khobar</h1>
-            <p className="text-md text-blue-600 font-semibold italic">Marwa Circle</p>
-          </div>
+        <div className="flex items-center justify-between border-b pb-8 mb-8">
+            <div className="flex items-center gap-6">
+                <div className="w-20 h-20 bg-white flex items-center justify-center rounded-2xl shadow-lg border-4 border-white overflow-hidden shrink-0">
+                    <img 
+                    src="/YI-logo.jpeg" 
+                    alt="YI Logo" 
+                    className="object-contain w-full h-full" 
+                    />
+                </div>
+                <div>
+                    <h1 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Youth India Khobar</h1>
+                    <p className="text-md text-blue-600 font-semibold italic">Marwa Circle</p>
+                </div>
+            </div>
+            <button 
+              onClick={() => { localStorage.removeItem('yi_minutes_auth'); setIsAuthorized(false); }}
+              className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 px-3 py-1 rounded-lg"
+            >
+                Logout
+            </button>
         </div>
 
         {/* Info Grid */}
