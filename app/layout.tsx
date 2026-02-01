@@ -23,23 +23,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Use a fallback to prevent the build from crashing
-  // Vercel build environment sometimes hides these from static workers
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-
-  if (!publishableKey && process.env.NODE_ENV === "production") {
-    // This logs to your Vercel build logs so you can verify it's missing
-    console.warn("⚠️ Clerk Publishable Key missing during build. Ensure it is set in Vercel Settings.");
-  }
-
   return (
-    // Providing the key prop directly is correct, but we add 'dynamic' 
-    // to help Clerk handle static generation better.
-    <ClerkProvider publishableKey={publishableKey}>
+    <ClerkProvider>
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+          {/* Header with Login/Logout logic */}
           <header className="flex justify-between items-center p-4 border-b bg-white">
-            <h1 className="font-bold text-lg text-blue-600">YI Minutes</h1>
+            <h1 className="font-bold text-lg">YI Minutes</h1>
             <div>
               <SignedOut>
                 <SignInButton mode="modal">
@@ -51,7 +41,8 @@ export default function RootLayout({
               </SignedIn>
             </div>
           </header>
-          <main className="min-h-screen bg-gray-50">{children}</main>
+
+          <main>{children}</main>
         </body>
       </html>
     </ClerkProvider>
