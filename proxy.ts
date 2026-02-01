@@ -6,7 +6,7 @@ const isProtectedRoute = createRouteMatcher(['/']);
 
 // 🛑 ADD YOUR AUTHORIZED EMAILS HERE
 const ALLOWED_EMAILS = [
-  "rashadnazer@gmail.com", 
+  "rashadnazer7@gmail.com", 
 ];
 
 export default clerkMiddleware(async (auth, req) => {
