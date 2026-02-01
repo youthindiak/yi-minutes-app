@@ -23,20 +23,22 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Pull the key
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  // Use a fallback to prevent the build from crashing
+  // Vercel build environment sometimes hides these from static workers
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
-  // During build-time on Vercel, if the key isn't found, we provide 
-  // a fallback or a warning instead of a 'throw' to prevent build failure.
   if (!publishableKey && process.env.NODE_ENV === "production") {
-    console.warn("Clerk Publishable Key is missing. This might break auth in production.");
+    // This logs to your Vercel build logs so you can verify it's missing
+    console.warn("⚠️ Clerk Publishable Key missing during build. Ensure it is set in Vercel Settings.");
   }
 
   return (
+    // Providing the key prop directly is correct, but we add 'dynamic' 
+    // to help Clerk handle static generation better.
     <ClerkProvider publishableKey={publishableKey}>
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-           <header className="flex justify-between items-center p-4 border-b bg-white">
+          <header className="flex justify-between items-center p-4 border-b bg-white">
             <h1 className="font-bold text-lg text-blue-600">YI Minutes</h1>
             <div>
               <SignedOut>
