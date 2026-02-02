@@ -2,18 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import { Plus, Trash2, Clock, MessageSquare, CheckCircle2, FileText, ArrowRight, UserPlus, X, Loader2, Lock, ShieldCheck } from 'lucide-react';
-import { PRESET_NAMES } from '../src/data/members';
-
-// --- CONFIGURATION ---
-const AUTHORIZED_KEY = "YIMarwa@2026"; // Change this to your preferred code
+// Import the new configuration object
+import { CIRCLE_DATA } from '../src/data/members';
 
 const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 
 export default function MinutesApp() {
-  // Authorization State
+  // Authorization State - Now stores the whole Circle Object
   const [passcode, setPasscode] = useState('');
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [activeCircle, setActiveCircle] = useState<{name: string, members: string[]} | null>(null);
   const [authError, setAuthError] = useState(false);
 
   // Form States
@@ -31,23 +29,33 @@ export default function MinutesApp() {
   const [topics, setTopics] = useState(['']);
   const [decisions, setDecisions] = useState(['']);
 
-  // Check for existing session
+  // Check for existing session on load
   useEffect(() => {
-    const savedAuth = localStorage.getItem('yi_minutes_auth');
-    if (savedAuth === AUTHORIZED_KEY) {
-      setIsAuthorized(true);
+    const savedPass = localStorage.getItem('yi_minutes_auth_pass');
+    if (savedPass && CIRCLE_DATA[savedPass]) {
+      setActiveCircle(CIRCLE_DATA[savedPass]);
     }
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === AUTHORIZED_KEY) {
-      setIsAuthorized(true);
-      localStorage.setItem('yi_minutes_auth', AUTHORIZED_KEY);
+    // Check if the password exists in our CIRCLE_DATA
+    const foundCircle = CIRCLE_DATA[passcode];
+    
+    if (foundCircle) {
+      setActiveCircle(foundCircle);
+      localStorage.setItem('yi_minutes_auth_pass', passcode);
       setAuthError(false);
     } else {
       setAuthError(true);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('yi_minutes_auth_pass');
+    setActiveCircle(null);
+    setPasscode('');
+    setAttendees([]); // Reset attendees for security
   };
 
   useEffect(() => {
@@ -89,6 +97,7 @@ export default function MinutesApp() {
   };
 
   const generatePDF = async () => {
+    if (!activeCircle) return;
     setIsSaving(true);
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -97,77 +106,61 @@ export default function MinutesApp() {
     try {
       doc.addImage("/YI-logo.jpeg", "JPEG", centerX - 15, 15, 30, 30, undefined, 'NONE');
     } catch (e) {
-      doc.setFontSize(22);
-      doc.setTextColor(0, 51, 153);
-      doc.text("YI", centerX, 30, { align: "center" });
+      doc.setFontSize(22).setTextColor(0, 51, 153).text("YI", centerX, 30, { align: "center" });
     }
 
-    doc.setFontSize(22);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.text("Youth India Khobar", centerX, 55, { align: "center" });
+    doc.setFontSize(22).setTextColor(0, 0, 0).setFont("helvetica", "bold").text("Youth India Khobar", centerX, 55, { align: "center" });
 
-    doc.setFontSize(14);
-    doc.setTextColor(0, 51, 153);
-    doc.setFont("helvetica", "italic");
-    doc.text("Marwa Circle", centerX, 63, { align: "center" });
+    // DYNAMIC CIRCLE NAME IN PDF
+    doc.setFontSize(14).setTextColor(0, 51, 153).setFont("helvetica", "italic").text(activeCircle.name, centerX, 63, { align: "center" });
 
-    doc.setDrawColor(200);
-    doc.line(20, 78, 190, 78);
+    doc.setDrawColor(200).line(20, 78, 190, 78);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Location: ${location || 'N/A'}  |  Date: ${date || 'N/A'}  |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
+    doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(100).text(`Location: ${location || 'N/A'}  |  Date: ${date || 'N/A'}  |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
 
     let y = 90;
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Members Present:", 20, y);
+    doc.setTextColor(0).setFont("helvetica", "bold").setFontSize(12).text("Members Present:", 20, y);
     
     y += 7;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal").setFontSize(10);
     const memberList = attendees.join(", ") || "None recorded";
     const splitAttendees = doc.splitTextToSize(memberList, 170);
     doc.text(splitAttendees, 20, y);
     
     y += (splitAttendees.length * 5); 
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total attendees: ${attendees.length}`, 20, y);
+    doc.setFont("helvetica", "bold").text(`Total attendees: ${attendees.length}`, 20, y);
 
     y += 12;
-    doc.setFontSize(12);
-    doc.text("Agenda & Timeline:", 20, y);
+    doc.setFontSize(12).text("Agenda & Timeline:", 20, y);
     y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal").setFontSize(10);
     agendaItems.forEach(item => {
       doc.text(`${item.h}:${item.m} ${item.p} - ${item.hEnd}:${item.mEnd} ${item.pEnd}: ${item.desc}`, 25, y);
       y += 7;
     });
 
     y += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text("Topics Discussed:", 20, y);
+    doc.setFont("helvetica", "bold").text("Topics Discussed:", 20, y);
     y += 7;
     doc.setFont("helvetica", "normal");
     topics.forEach(t => { if(t) { doc.text(`• ${t}`, 25, y); y += 6; }});
 
     y += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text("Decisions Made:", 20, y);
+    doc.setFont("helvetica", "bold").text("Decisions Made:", 20, y);
     y += 7;
     doc.setFont("helvetica", "normal");
     decisions.forEach(d => { if(d) { doc.text(`• ${d}`, 25, y); y += 6; }});
 
-    doc.save(`YI_Khobar_Marwa_Minutes_${date || 'Meeting'}.pdf`);
+    // DYNAMIC FILENAME
+    const safeCircleName = activeCircle.name.replace(/\s+/g, '_');
+    doc.save(`YI_Khobar_${safeCircleName}_Minutes_${date || 'Meeting'}.pdf`);
 
     try {
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       const payload = {
-        date: date,
+        circleName: activeCircle.name,
+        circle: activeCircle.name, // Added circle name to payload
+        date: date|| new Date().toISOString().split('T')[0],
         location: location,
         attendees: attendees.join(", "),
         attendeesCount: attendees.length,
@@ -177,16 +170,15 @@ export default function MinutesApp() {
         pdfBase64: pdfBase64 
       };
 
-      await fetch('https://script.google.com/macros/s/AKfycbyGJkZoZg_seDRotE0AEMsY7EVa28sir-rjmOOe6l4xU40A2wV6kNYZJAWlXeK6jvqAUw/exec', {
+      await fetch('https://script.google.com/macros/s/AKfycbxFDQuIKCUNeeg_Y1AHX3nElfovWi9ssIFMnYjTFpUuzzNDHzkoFUOibJLZwhgR1HtfgA/exec', {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       
-      alert("Success: PDF saved and data synced to Google Sheets!");
+      alert(`Success: ${activeCircle.name} Minutes saved and synced!`);
     } catch (error) {
-      console.error("Sync Error:", error);
       alert("PDF generated, but there was an error syncing to Google Sheets.");
     } finally {
       setIsSaving(false);
@@ -208,33 +200,29 @@ export default function MinutesApp() {
   );
 
   // --- LOGIN UI ---
-  if (!isAuthorized) {
+  if (!activeCircle) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 md:p-12 border border-gray-100 text-center">
           <div className="w-20 h-20 bg-blue-50 mx-auto rounded-3xl flex items-center justify-center mb-6">
             <Lock className="text-blue-600" size={40} />
           </div>
-          <h1 className="text-2xl font-black text-gray-900 mb-2">YI MINUTES</h1>
-          <p className="text-gray-500 text-sm mb-8 font-medium">Please enter the authorization code to access the Marwa Circle Minutes App.</p>
+          <h1 className="text-2xl font-black text-gray-900 mb-2 uppercase">Circle Access</h1>
+          <p className="text-gray-500 text-sm mb-8 font-medium">Enter your circle's unique authorization code.</p>
           
           <form onSubmit={handleLogin} className="space-y-4">
             <input 
               type="password"
               placeholder="Authorization Code"
-              className={`w-full bg-gray-50 border ${authError ? 'border-red-500' : 'border-gray-200'} rounded-2xl px-6 py-4 text-center text-xl tracking-[0.5em] font-bold focus:ring-4 focus:ring-blue-100 outline-none transition-all`}
+              className={`w-full bg-gray-50 border ${authError ? 'border-red-500' : 'border-gray-200'} rounded-2xl px-6 py-4 text-center text-xl font-bold focus:ring-4 focus:ring-blue-100 outline-none transition-all`}
               value={passcode}
               onChange={(e) => setPasscode(e.target.value)}
             />
-            {authError && <p className="text-red-500 text-xs font-bold uppercase tracking-wider">Incorrect Secret Code</p>}
-            <button 
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              <ShieldCheck size={20} /> Access App
+            {authError && <p className="text-red-500 text-xs font-bold uppercase tracking-wider">Invalid Circle Code</p>}
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+              <ShieldCheck size={20} /> Login to Circle
             </button>
           </form>
-          <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">Authorized Personnel Only</p>
         </div>
       </div>
     );
@@ -245,26 +233,22 @@ export default function MinutesApp() {
     <main className="p-4 md:p-10 bg-slate-50 min-h-screen font-sans text-gray-800">
       <div className="max-w-5xl mx-auto bg-white p-6 md:p-12 rounded-[2.5rem] shadow-2xl border border-gray-100">
         
-        {/* Header */}
+        {/* Header - DYNAMIC CIRCLE NAME */}
         <div className="flex items-center justify-between border-b pb-8 mb-8">
             <div className="flex items-center gap-6">
                 <div className="w-20 h-20 bg-white flex items-center justify-center rounded-2xl shadow-lg border-4 border-white overflow-hidden shrink-0">
-                    <img 
-                    src="/YI-logo.jpeg" 
-                    alt="YI Logo" 
-                    className="object-contain w-full h-full" 
-                    />
+                    <img src="/YI-logo.jpeg" alt="YI Logo" className="object-contain w-full h-full" />
                 </div>
                 <div>
                     <h1 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Youth India Khobar</h1>
-                    <p className="text-md text-blue-600 font-semibold italic">Marwa Circle</p>
+                    <p className="text-md text-blue-600 font-bold italic">{activeCircle.name}</p>
                 </div>
             </div>
             <button 
-              onClick={() => { localStorage.removeItem('yi_minutes_auth'); setIsAuthorized(false); }}
+              onClick={handleLogout}
               className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 px-3 py-1 rounded-lg"
             >
-                Logout
+                Switch Circle
             </button>
         </div>
 
@@ -283,15 +267,15 @@ export default function MinutesApp() {
           </div>
         </div>
 
-        {/* Attendance Section */}
+        {/* Attendance Section - DYNAMIC MEMBERS */}
         <div className="mb-10">
-          <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 ml-1">Attendance</label>
+          <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 ml-1">Attendance ({activeCircle.name})</label>
           <div className="flex gap-2 mb-6 max-w-md">
             <div className="relative flex-1">
               <UserPlus className="absolute left-4 top-3.5 text-gray-400" size={18} />
               <input 
                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-11 pr-4 py-3 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-                placeholder="Add other member name..." 
+                placeholder="Add visitor name..." 
                 value={customName}
                 onChange={e => setCustomName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addCustomAttendee()}
@@ -303,12 +287,14 @@ export default function MinutesApp() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {PRESET_NAMES.map(name => (
+            {/* Show only this circle's members */}
+            {activeCircle.members.map(name => (
               <button key={name} onClick={() => toggleAttendee(name)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${attendees.includes(name) ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white text-gray-500 border-gray-100 hover:border-blue-200"}`}>
                 {name}
               </button>
             ))}
-            {attendees.filter(a => !PRESET_NAMES.includes(a)).map(name => (
+            {/* Show manually added guests */}
+            {attendees.filter(a => !activeCircle.members.includes(a)).map(name => (
               <div key={name} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 shadow-sm">
                 {name}
                 <X size={14} className="cursor-pointer hover:text-red-500" onClick={() => toggleAttendee(name)} />
@@ -368,11 +354,11 @@ export default function MinutesApp() {
         >
           {isSaving ? (
             <>
-              <Loader2 className="animate-spin" /> Syncing with Google...
+              <Loader2 className="animate-spin" /> Syncing {activeCircle.name} data...
             </>
           ) : (
             <>
-              <FileText /> Generate & Save Minutes
+              <FileText /> Generate & Save {activeCircle.name} Minutes
             </>
           )}
         </button>
