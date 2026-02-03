@@ -11,7 +11,7 @@ export const CIRCLE_DATA: Record<string, { name: string, members: string[] }> = 
               "Fatheen", 
               "Ramzi", 
               "Shamil Ahammad", 
-              "Unais", 
+              "Unaise", 
               "Ahamed Ziyadh", 
               "Khaleel Rahman", 
               "Shaheem", 
