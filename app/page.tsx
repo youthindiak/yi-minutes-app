@@ -24,8 +24,15 @@ export default function MinutesApp() {
   const [customName, setCustomName] = useState('');
 
   const [agendaItems, setAgendaItems] = useState([
-    { h: '10', m: '00', p: 'AM', hEnd: '10', mEnd: '30', pEnd: 'AM', desc: '' }
-  ]);
+  { 
+    h: '10', m: '00', p: 'AM', 
+    hEnd: '10', mEnd: '30', pEnd: 'AM', 
+    session: 'General Discussion', 
+    otherSession: '', 
+    speaker: 'All', 
+    details: '' 
+  }
+]);
   const [topics, setTopics] = useState(['']);
   const [decisions, setDecisions] = useState(['']);
 
@@ -78,14 +85,17 @@ export default function MinutesApp() {
   };
 
   const addRow = (type: 'agenda' | 'topics' | 'decisions') => {
-    if (type === 'agenda') {
-      const lastItem = agendaItems[agendaItems.length - 1];
-      setAgendaItems([...agendaItems, { 
-        h: lastItem.hEnd, m: lastItem.mEnd, p: lastItem.pEnd, 
-        hEnd: lastItem.hEnd, mEnd: lastItem.mEnd, pEnd: lastItem.pEnd, 
-        desc: '' 
-      }]);
-    }
+  if (type === 'agenda') {
+    const lastItem = agendaItems[agendaItems.length - 1];
+    setAgendaItems([...agendaItems, { 
+      h: lastItem.hEnd, m: lastItem.mEnd, p: lastItem.pEnd, 
+      hEnd: lastItem.hEnd, mEnd: lastItem.mEnd, pEnd: lastItem.pEnd, 
+      session: 'General Discussion',
+      otherSession: '',
+      speaker: 'All', // Explicitly set default to 'All'
+      details: '' 
+    }]);
+  }
     if (type === 'topics') setTopics([...topics, '']);
     if (type === 'decisions') setDecisions([...decisions, '']);
   };
@@ -110,13 +120,18 @@ export default function MinutesApp() {
     }
 
     doc.setFontSize(22).setTextColor(0, 0, 0).setFont("helvetica", "bold").text("Youth India Khobar", centerX, 55, { align: "center" });
+    let formattedDate = "N/A";
+    if (date) {
+      const [year, month, day] = date.split('-');
+      formattedDate = `${day}/${month}/${year}`;
+    }
 
     // DYNAMIC CIRCLE NAME IN PDF
     doc.setFontSize(14).setTextColor(0, 51, 153).setFont("helvetica", "italic").text(activeCircle.name, centerX, 63, { align: "center" });
 
     doc.setDrawColor(200).line(20, 78, 190, 78);
 
-    doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(100).text(`Location: ${location || 'N/A'}  |  Date: ${date || 'N/A'}  |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
+    doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(100).text(`Location: ${location || 'N/A'}  |  Date: ${formattedDate} |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
 
     let y = 90;
     doc.setTextColor(0).setFont("helvetica", "bold").setFontSize(12).text("Members Present:", 20, y);
@@ -131,12 +146,23 @@ export default function MinutesApp() {
     doc.setFont("helvetica", "bold").text(`Total attendees: ${attendees.length}`, 20, y);
 
     y += 12;
-    doc.setFontSize(12).text("Agenda & Timeline:", 20, y);
+    doc.setFontSize(12).setFont("helvetica", "bold").text("Agenda & Timeline:", 20, y);
     y += 8;
     doc.setFont("helvetica", "normal").setFontSize(10);
+
     agendaItems.forEach(item => {
-      doc.text(`${item.h}:${item.m} ${item.p} - ${item.hEnd}:${item.mEnd} ${item.pEnd}: ${item.desc}`, 25, y);
-      y += 7;
+      const sessionName = item.session === 'Others' ? (item.otherSession || 'Other') : item.session;
+      const speakerName = item.speaker || "All";
+      // Added the '-' before details as requested
+      const detailStr = item.details ? ` - ${item.details}` : ''; 
+      
+      const agendaLine = `${item.h}:${item.m} ${item.p} - ${item.hEnd}:${item.mEnd} ${item.pEnd}: ${sessionName} - ${speakerName}${detailStr}`;
+      
+      // Use splitTextToSize to prevent the text from running off the page
+      const splitLine = doc.splitTextToSize(agendaLine, 170);
+      doc.text(splitLine, 25, y);
+      
+      y += (splitLine.length * 7);
     });
 
     y += 5;
@@ -154,17 +180,23 @@ export default function MinutesApp() {
     // DYNAMIC FILENAME
     const safeCircleName = activeCircle.name.replace(/\s+/g, '_');
     doc.save(`YI_Khobar_${safeCircleName}_Minutes_${date || 'Meeting'}.pdf`);
-
+    
     try {
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       const payload = {
         circleName: activeCircle.name,
         circle: activeCircle.name, // Added circle name to payload
-        date: date|| new Date().toISOString().split('T')[0],
+        date: formattedDate,
         location: location,
         attendees: attendees.join(", "),
         attendeesCount: attendees.length,
-        agenda: agendaItems.map(item => `${item.h}:${item.m} ${item.p} - ${item.desc}`).join(" | "),
+        agenda: agendaItems.map(item => {
+          const sessionName = item.session === 'Others' ? (item.otherSession || 'Other') : item.session;
+          const speakerName = item.speaker || "All";
+          const detailStr = item.details ? ` - ${item.details}` : ''; // Added '-' here too
+          
+          return `${item.h}:${item.m}${item.p}-${item.hEnd}:${item.mEnd}${item.pEnd}: ${sessionName} - ${speakerName}${detailStr}`;
+        }).join(" | "),
         topics: topics.filter(t => t.trim() !== "").join(" | "), 
         decisions: decisions.filter(d => d.trim() !== "").join(" | "),
         pdfBase64: pdfBase64 
@@ -310,18 +342,65 @@ export default function MinutesApp() {
             <button onClick={() => addRow('agenda')} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md text-sm font-bold active:scale-95 transition-all"><Plus size={16} /> Add Topic</button>
           </div>
           <div className="space-y-4">
-            {agendaItems.map((item, index) => (
-              <div key={index} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap lg:flex-nowrap items-center gap-4">
-                <TimePicker label="Start" h={item.h} m={item.m} p={item.p} onChange={(k:any, v:any) => { const n = [...agendaItems]; (n[index] as any)[k] = v; setAgendaItems(n); }} light />
-                <ArrowRight className="mt-4 text-gray-300 hidden lg:block" size={16}/>
-                <TimePicker label="End" h={item.hEnd} m={item.mEnd} p={item.pEnd} onChange={(k:any, v:any) => { const n = [...agendaItems]; (n[index] as any)[k === 'h' ? 'hEnd' : k === 'm' ? 'mEnd' : 'pEnd'] = v; setAgendaItems(n); }} light />
-                <div className="flex-1 min-w-[200px] flex flex-col gap-1">
-                   <span className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-wider">Discussion Topic</span>
-                   <input className="w-full bg-gray-50 border-none rounded-xl px-4 py-2 shadow-inner focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Agenda topic..." value={item.desc} onChange={e => { const n = [...agendaItems]; n[index].desc = e.target.value; setAgendaItems(n); }} />
-                </div>
-                {index > 0 && <button onClick={() => removeRow(index, 'agenda')} className="self-end mb-2 text-red-300 hover:text-red-500"><Trash2 size={20} /></button>}
-              </div>
-            ))}
+           {agendaItems.map((item, index) => (
+  <div key={index} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap items-end gap-4">
+    <TimePicker label="Start" h={item.h} m={item.m} p={item.p} onChange={(k:any, v:any) => { const n = [...agendaItems]; (n[index] as any)[k] = v; setAgendaItems(n); }} light />
+    <TimePicker label="End" h={item.hEnd} m={item.mEnd} p={item.pEnd} onChange={(k:any, v:any) => { const n = [...agendaItems]; (n[index] as any)[k === 'h' ? 'hEnd' : k === 'm' ? 'mEnd' : 'pEnd'] = v; setAgendaItems(n); }} light />
+
+    {/* Session Dropdown */}
+    <div className="flex-1 min-w-[150px] flex flex-col gap-1">
+      <span className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-wider">Session</span>
+      <select 
+        className={iosSelectStyle} 
+        value={item.session} 
+        onChange={e => { const n = [...agendaItems]; n[index].session = e.target.value; setAgendaItems(n); }}
+      >
+        {['Qira\'at', 'Quran Class', 'General Discussion', 'Ulbodhanam', 'Break', 'Others'].map(s => <option key={s}>{s}</option>)}
+      </select>
+      {item.session === 'Others' && (
+        <input 
+          className="mt-2 w-full bg-orange-50 border border-orange-100 rounded-xl px-3 py-1 text-sm outline-none" 
+          placeholder="Session Name..." 
+          value={item.otherSession}
+          onChange={e => { const n = [...agendaItems]; n[index].otherSession = e.target.value; setAgendaItems(n); }}
+        />
+      )}
+    </div>
+
+    {/* Speaker Dropdown */}
+    <div className="flex-1 min-w-[150px] flex flex-col gap-1">
+      <span className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-wider">Led By</span>
+      <select 
+        className={iosSelectStyle} 
+        value={item.speaker} 
+        onChange={e => { const n = [...agendaItems]; n[index].speaker = e.target.value; setAgendaItems(n); }}
+      >
+        <option>All</option>
+        {attendees.map(name => <option key={name}>{name}</option>)}
+      </select>
+    </div>
+
+    {/* Details Box */}
+<div className="flex-[1.5] min-w-[200px] flex flex-col gap-1">
+  <span className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-wider">
+    Details (Optional - No Colons)
+  </span>
+  <input 
+    className="w-full bg-gray-50 border-none rounded-xl px-4 py-2 shadow-inner focus:ring-2 focus:ring-blue-500 outline-none" 
+    placeholder="Specific notes..." 
+    value={item.details} 
+    onChange={e => { 
+      const n = [...agendaItems];
+      // This regex removes all colons globally
+      n[index].details = e.target.value.replace(/:/g, ''); 
+      setAgendaItems(n); 
+    }} 
+  />
+</div>
+
+    {index > 0 && <button onClick={() => removeRow(index, 'agenda')} className="mb-2 text-red-300 hover:text-red-500"><Trash2 size={20} /></button>}
+  </div>
+))}
           </div>
         </div>
 

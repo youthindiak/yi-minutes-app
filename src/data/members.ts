@@ -6,7 +6,7 @@ export const CIRCLE_DATA: Record<string, { name: string, members: string[] }> = 
     name: "Marwa Circle",
     members: ["Rashad Nazer", 
               "Ameen Ahsan", 
-              "Abubacker", 
+              "Aboobacker", 
               "Ashik Ameen", 
               "Fatheen", 
               "Ramzi", 
