@@ -122,8 +122,16 @@ export default function MinutesApp() {
     doc.setFontSize(22).setTextColor(0, 0, 0).setFont("helvetica", "bold").text("Youth India Khobar", centerX, 55, { align: "center" });
     let formattedDate = "N/A";
     if (date) {
+      // split('-') works because HTML date input always returns YYYY-MM-DD
       const [year, month, day] = date.split('-');
       formattedDate = `${day}/${month}/${year}`;
+    } else {
+      // Optional: Default to today's date if user forgot to pick one
+      const today = new Date();
+      const d = String(today.getDate()).padStart(2, '0');
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      const y = today.getFullYear();
+      formattedDate = `${d}/${m}/${y}`;
     }
 
     // DYNAMIC CIRCLE NAME IN PDF
@@ -381,22 +389,23 @@ export default function MinutesApp() {
     </div>
 
     {/* Details Box */}
-<div className="flex-[1.5] min-w-[200px] flex flex-col gap-1">
-  <span className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-wider">
-    Details (Optional - No Colons)
-  </span>
-  <input 
-    className="w-full bg-gray-50 border-none rounded-xl px-4 py-2 shadow-inner focus:ring-2 focus:ring-blue-500 outline-none" 
-    placeholder="Specific notes..." 
-    value={item.details} 
-    onChange={e => { 
-      const n = [...agendaItems];
-      // This regex removes all colons globally
-      n[index].details = e.target.value.replace(/:/g, ''); 
-      setAgendaItems(n); 
-    }} 
-  />
-</div>
+    <div className="flex-[1.5] min-w-[200px] flex flex-col gap-1">
+      <span className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-wider">
+        Details (Optional - No Special Chars)
+      </span>
+      <input 
+        className="w-full bg-gray-50 border-none rounded-xl px-4 py-2 shadow-inner focus:ring-2 focus:ring-blue-500 outline-none" 
+        placeholder="Specific notes..." 
+        value={item.details} 
+        onChange={e => { 
+          const n = [...agendaItems];
+          // Updated Regex: Allows letters, numbers, spaces, and ()
+          // It removes everything else.
+          n[index].details = e.target.value.replace(/[^a-zA-Z0-9\s()]/g, ''); 
+          setAgendaItems(n); 
+        }} 
+      />
+    </div>
 
     {index > 0 && <button onClick={() => removeRow(index, 'agenda')} className="mb-2 text-red-300 hover:text-red-500"><Trash2 size={20} /></button>}
   </div>
