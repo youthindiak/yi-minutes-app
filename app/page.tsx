@@ -193,7 +193,7 @@ export default function MinutesApp() {
       pdfBase64: pdfBase64 
     };
 
-    await fetch('https://script.google.com/macros/s/AKfycbw_icFIeDeOnBu7g9eFggl41B5xpLQMsDDzuvWChopmbrJcKgN2om60FYVehU-oYqgV0A/exec', {
+    await fetch('https://script.google.com/macros/s/AKfycbxnpiEzsLagENzkQbtKStl9BMTGkro1NexuiPDyPkUq-Etc4fQELWC0H3qeanHe_zc3/exec', {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
