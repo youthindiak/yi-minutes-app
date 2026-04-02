@@ -2,19 +2,20 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import { Plus, Trash2, Clock, MessageSquare, CheckCircle2, FileText, ArrowRight, UserPlus, X, Loader2, Lock, ShieldCheck } from 'lucide-react';
-// Import the new configuration object
 import { CIRCLE_DATA } from '../src/data/members';
 
 const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 
 export default function MinutesApp() {
-  // Authorization State - Now stores the whole Circle Object
   const [passcode, setPasscode] = useState('');
   const [activeCircle, setActiveCircle] = useState<{name: string, members: string[]} | null>(null);
   const [authError, setAuthError] = useState(false);
 
-  // Form States
+  // New Meeting Type State
+  const [meetingType, setMeetingType] = useState('തസ്‌കിയ യോഗം');
+  const [otherMeetingType, setOtherMeetingType] = useState('');
+  
   const [location, setLocation] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState({ h: '10', m: '00', p: 'AM' });
@@ -24,19 +25,11 @@ export default function MinutesApp() {
   const [customName, setCustomName] = useState('');
 
   const [agendaItems, setAgendaItems] = useState([
-  { 
-    h: '10', m: '00', p: 'AM', 
-    hEnd: '10', mEnd: '30', pEnd: 'AM', 
-    session: 'General Discussion', 
-    otherSession: '', 
-    speaker: 'All', 
-    details: '' 
-  }
-]);
+    { h: '10', m: '00', p: 'AM', hEnd: '10', mEnd: '30', pEnd: 'AM', session: 'General Discussion', otherSession: '', speaker: 'All', details: '' }
+  ]);
   const [topics, setTopics] = useState(['']);
   const [decisions, setDecisions] = useState(['']);
 
-  // Check for existing session on load
   useEffect(() => {
     const savedPass = localStorage.getItem('yi_minutes_auth_pass');
     if (savedPass && CIRCLE_DATA[savedPass]) {
@@ -46,9 +39,7 @@ export default function MinutesApp() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Check if the password exists in our CIRCLE_DATA
     const foundCircle = CIRCLE_DATA[passcode];
-    
     if (foundCircle) {
       setActiveCircle(foundCircle);
       localStorage.setItem('yi_minutes_auth_pass', passcode);
@@ -62,16 +53,8 @@ export default function MinutesApp() {
     localStorage.removeItem('yi_minutes_auth_pass');
     setActiveCircle(null);
     setPasscode('');
-    setAttendees([]); // Reset attendees for security
+    setAttendees([]);
   };
-
-  useEffect(() => {
-    setAgendaItems(prev => {
-      const newItems = [...prev];
-      newItems[0] = { ...newItems[0], h: startTime.h, m: startTime.m, p: startTime.p };
-      return newItems;
-    });
-  }, [startTime]);
 
   const toggleAttendee = (name: string) => {
     setAttendees(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
@@ -85,17 +68,10 @@ export default function MinutesApp() {
   };
 
   const addRow = (type: 'agenda' | 'topics' | 'decisions') => {
-  if (type === 'agenda') {
-    const lastItem = agendaItems[agendaItems.length - 1];
-    setAgendaItems([...agendaItems, { 
-      h: lastItem.hEnd, m: lastItem.mEnd, p: lastItem.pEnd, 
-      hEnd: lastItem.hEnd, mEnd: lastItem.mEnd, pEnd: lastItem.pEnd, 
-      session: 'General Discussion',
-      otherSession: '',
-      speaker: 'All', // Explicitly set default to 'All'
-      details: '' 
-    }]);
-  }
+    if (type === 'agenda') {
+      const lastItem = agendaItems[agendaItems.length - 1];
+      setAgendaItems([...agendaItems, { h: lastItem.hEnd, m: lastItem.mEnd, p: lastItem.pEnd, hEnd: lastItem.hEnd, mEnd: lastItem.mEnd, pEnd: lastItem.pEnd, session: 'General Discussion', otherSession: '', speaker: 'All', details: '' }]);
+    }
     if (type === 'topics') setTopics([...topics, '']);
     if (type === 'decisions') setDecisions([...decisions, '']);
   };
@@ -107,123 +83,130 @@ export default function MinutesApp() {
   };
 
   const generatePDF = async () => {
-    if (!activeCircle) return;
-    setIsSaving(true);
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const centerX = pageWidth / 2;
+  if (!activeCircle) return;
+  setIsSaving(true);
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const centerX = pageWidth / 2;
 
-    try {
-      doc.addImage("/YI-logo.jpeg", "JPEG", centerX - 15, 15, 30, 30, undefined, 'NONE');
-    } catch (e) {
-      doc.setFontSize(22).setTextColor(0, 51, 153).text("YI", centerX, 30, { align: "center" });
-    }
-
-    doc.setFontSize(22).setTextColor(0, 0, 0).setFont("helvetica", "bold").text("Youth India Khobar", centerX, 55, { align: "center" });
-    let formattedDate = "N/A";
-    if (date) {
-      // split('-') works because HTML date input always returns YYYY-MM-DD
-      const [year, month, day] = date.split('-');
-      formattedDate = `${day}/${month}/${year}`;
-    } else {
-      // Optional: Default to today's date if user forgot to pick one
-      const today = new Date();
-      const d = String(today.getDate()).padStart(2, '0');
-      const m = String(today.getMonth() + 1).padStart(2, '0');
-      const y = today.getFullYear();
-      formattedDate = `${d}/${m}/${y}`;
-    }
-
-    // DYNAMIC CIRCLE NAME IN PDF
-    doc.setFontSize(14).setTextColor(0, 51, 153).setFont("helvetica", "italic").text(activeCircle.name, centerX, 63, { align: "center" });
-
-    doc.setDrawColor(200).line(20, 78, 190, 78);
-
-    doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(100).text(`Location: ${location || 'N/A'}  |  Date: ${formattedDate} |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
-
-    let y = 90;
-    doc.setTextColor(0).setFont("helvetica", "bold").setFontSize(12).text("Members Present:", 20, y);
-    
-    y += 7;
-    doc.setFont("helvetica", "normal").setFontSize(10);
-    const memberList = attendees.join(", ") || "None recorded";
-    const splitAttendees = doc.splitTextToSize(memberList, 170);
-    doc.text(splitAttendees, 20, y);
-    
-    y += (splitAttendees.length * 5); 
-    doc.setFont("helvetica", "bold").text(`Total attendees: ${attendees.length}`, 20, y);
-
-    y += 12;
-    doc.setFontSize(12).setFont("helvetica", "bold").text("Agenda & Timeline:", 20, y);
-    y += 8;
-    doc.setFont("helvetica", "normal").setFontSize(10);
-
-    agendaItems.forEach(item => {
-      const sessionName = item.session === 'Others' ? (item.otherSession || 'Other') : item.session;
-      const speakerName = item.speaker || "All";
-      // Added the '-' before details as requested
-      const detailStr = item.details ? ` - ${item.details}` : ''; 
-      
-      const agendaLine = `${item.h}:${item.m} ${item.p} - ${item.hEnd}:${item.mEnd} ${item.pEnd}: ${sessionName} - ${speakerName}${detailStr}`;
-      
-      // Use splitTextToSize to prevent the text from running off the page
-      const splitLine = doc.splitTextToSize(agendaLine, 170);
-      doc.text(splitLine, 25, y);
-      
-      y += (splitLine.length * 7);
-    });
-
-    y += 5;
-    doc.setFont("helvetica", "bold").text("Topics Discussed:", 20, y);
-    y += 7;
-    doc.setFont("helvetica", "normal");
-    topics.forEach(t => { if(t) { doc.text(`• ${t}`, 25, y); y += 6; }});
-
-    y += 5;
-    doc.setFont("helvetica", "bold").text("Decisions Made:", 20, y);
-    y += 7;
-    doc.setFont("helvetica", "normal");
-    decisions.forEach(d => { if(d) { doc.text(`• ${d}`, 25, y); y += 6; }});
-
-    // DYNAMIC FILENAME
-    const safeCircleName = activeCircle.name.replace(/\s+/g, '_');
-    doc.save(`YI_Khobar_${safeCircleName}_Minutes_${date || 'Meeting'}.pdf`);
-    
-    try {
-      const pdfBase64 = doc.output('datauristring').split(',')[1];
-      const payload = {
-        circleName: activeCircle.name,
-        circle: activeCircle.name, // Added circle name to payload
-        date: formattedDate,
-        location: location,
-        attendees: attendees.join(", "),
-        attendeesCount: attendees.length,
-        agenda: agendaItems.map(item => {
-          const sessionName = item.session === 'Others' ? (item.otherSession || 'Other') : item.session;
-          const speakerName = item.speaker || "All";
-          const detailStr = item.details ? ` - ${item.details}` : ''; // Added '-' here too
-          
-          return `${item.h}:${item.m}${item.p}-${item.hEnd}:${item.mEnd}${item.pEnd}: ${sessionName} - ${speakerName}${detailStr}`;
-        }).join(" | "),
-        topics: topics.filter(t => t.trim() !== "").join(" | "), 
-        decisions: decisions.filter(d => d.trim() !== "").join(" | "),
-        pdfBase64: pdfBase64 
-      };
-
-      await fetch('https://script.google.com/macros/s/AKfycbxFDQuIKCUNeeg_Y1AHX3nElfovWi9ssIFMnYjTFpUuzzNDHzkoFUOibJLZwhgR1HtfgA/exec', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      alert(`Success: ${activeCircle.name} Minutes saved and synced!`);
-    } catch (error) {
-      alert("PDF generated, but there was an error syncing to Google Sheets.");
-    } finally {
-      setIsSaving(false);
-    }
+  // 1. Define the mapping with a TypeScript Index Signature
+  const typeMapping: { [key: string]: string } = {
+    "തസ്‌കിയ യോഗം": "Tazkiya",
+    "ദഅവ യോഗം": "Dawa",
+    "പ്രസ്ഥാന പഠന യോഗം": "Prasthana Padanam",
+    "സൗഹൃദ യോഗം": "Souhruda Yogam",
+    "തഹ്‌രീകി യോഗം": "Tehreeki",
+    "Others": otherMeetingType || "Other"
   };
+
+  // 2. Now this line will no longer throw an error
+  const pdfMeetingType = typeMapping[meetingType] || meetingType;
+  const sheetMeetingType = meetingType === 'Others' ? otherMeetingType : meetingType;
+
+  try {
+    doc.addImage("/YI-logo.jpeg", "JPEG", centerX - 15, 15, 30, 30, undefined, 'NONE');
+  } catch (e) {
+    doc.setFontSize(22).setTextColor(0, 51, 153).text("YI", centerX, 30, { align: "center" });
+  }
+
+  doc.setFontSize(22).setTextColor(0, 0, 0).setFont("helvetica", "bold").text("Youth India Khobar", centerX, 55, { align: "center" });
+  
+  let formattedDate = "N/A";
+  if (date) {
+    const [year, month, day] = date.split('-');
+    formattedDate = `${day}/${month}/${year}`;
+  } else {
+    const today = new Date();
+    formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  }
+
+  doc.setFontSize(14).setTextColor(0, 51, 153).setFont("helvetica", "italic").text(activeCircle.name, centerX, 63, { align: "center" });
+  doc.setDrawColor(200).line(20, 78, 190, 78);
+
+  // Sub-header info
+  doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(100).text(`Location: ${location || 'N/A'}  |  Date: ${formattedDate} |  Started: ${startTime.h}:${startTime.m} ${startTime.p}`, centerX, 73, { align: "center" });
+
+  let y = 85;
+  
+  // ADDED: Meeting Type section above Members
+  doc.setTextColor(0).setFont("helvetica", "bold").setFontSize(12).text("Meeting Type:", 20, y);
+  doc.setFont("helvetica", "normal").setFontSize(11).text(pdfMeetingType, 55, y);
+
+  y += 10;
+  doc.setTextColor(0).setFont("helvetica", "bold").setFontSize(12).text("Members Present:", 20, y);
+  
+  y += 7;
+  doc.setFont("helvetica", "normal").setFontSize(10);
+  const memberList = attendees.join(", ") || "None recorded";
+  const splitAttendees = doc.splitTextToSize(memberList, 170);
+  doc.text(splitAttendees, 20, y);
+  
+  y += (splitAttendees.length * 5); 
+  doc.setFont("helvetica", "bold").text(`Total attendees: ${attendees.length}`, 20, y);
+
+  y += 12;
+  doc.setFontSize(12).setFont("helvetica", "bold").text("Agenda & Timeline:", 20, y);
+  y += 8;
+  doc.setFont("helvetica", "normal").setFontSize(10);
+
+  agendaItems.forEach(item => {
+    const sessionName = item.session === 'Others' ? (item.otherSession || 'Other') : item.session;
+    const speakerName = item.speaker || "All";
+    const detailStr = item.details ? ` - ${item.details}` : ''; 
+    const agendaLine = `${item.h}:${item.m} ${item.p} - ${item.hEnd}:${item.mEnd} ${item.pEnd}: ${sessionName} - ${speakerName}${detailStr}`;
+    const splitLine = doc.splitTextToSize(agendaLine, 170);
+    doc.text(splitLine, 25, y);
+    y += (splitLine.length * 7);
+  });
+
+  y += 5;
+  doc.setFont("helvetica", "bold").text("Topics Discussed:", 20, y);
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  topics.forEach(t => { if(t) { doc.text(`• ${t}`, 25, y); y += 6; }});
+
+  y += 5;
+  doc.setFont("helvetica", "bold").text("Decisions Made:", 20, y);
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  decisions.forEach(d => { if(d) { doc.text(`• ${d}`, 25, y); y += 6; }});
+
+  const safeCircleName = activeCircle.name.replace(/\s+/g, '_');
+  doc.save(`YI_Khobar_${safeCircleName}_Minutes_${date || 'Meeting'}.pdf`);
+  
+  try {
+    const pdfBase64 = doc.output('datauristring').split(',')[1];
+    const payload = {
+      meetingId: `${activeCircle.name}-${Date.now()}`,
+      circleName: activeCircle.name,
+      meetingType: sheetMeetingType, // Sends Malayalam to Google Sheets
+      date: formattedDate,
+      location: location,
+      attendees: attendees.join(", "),
+      attendeesCount: attendees.length,
+      agenda: agendaItems.map(item => {
+        const sessionName = item.session === 'Others' ? (item.otherSession || 'Other') : item.session;
+        return `${item.h}:${item.m}${item.p}-${item.hEnd}:${item.mEnd}${item.pEnd}: ${sessionName} - ${item.speaker || "All"}${item.details ? ` - ${item.details}` : ''}`;
+      }).join(" | "),
+      topics: topics.filter(t => t.trim() !== "").join(" | "), 
+      decisions: decisions.filter(d => d.trim() !== "").join(" | "),
+      pdfBase64: pdfBase64 
+    };
+
+    await fetch('https://script.google.com/macros/s/AKfycbw_icFIeDeOnBu7g9eFggl41B5xpLQMsDDzuvWChopmbrJcKgN2om60FYVehU-oYqgV0A/exec', {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    alert(`Success: ${activeCircle.name} Minutes saved and synced!`);
+  } catch (error) {
+    alert("PDF generated, but there was an error syncing to Google Sheets.");
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const iosSelectStyle = "bg-gray-100 border-none rounded-lg px-2 py-2 text-sm font-bold text-gray-700 shadow-inner focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer";
 
@@ -239,41 +222,25 @@ export default function MinutesApp() {
     </div>
   );
 
-  // --- LOGIN UI ---
   if (!activeCircle) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 md:p-12 border border-gray-100 text-center">
-          <div className="w-20 h-20 bg-blue-50 mx-auto rounded-3xl flex items-center justify-center mb-6">
-            <Lock className="text-blue-600" size={40} />
-          </div>
-          <h1 className="text-2xl font-black text-gray-900 mb-2 uppercase">Circle Access</h1>
-          <p className="text-gray-500 text-sm mb-8 font-medium">Enter your circle's unique authorization code.</p>
-          
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 text-center border border-gray-100">
+          <div className="w-20 h-20 bg-blue-50 mx-auto rounded-3xl flex items-center justify-center mb-6"><Lock className="text-blue-600" size={40} /></div>
+          <h1 className="text-2xl font-black text-gray-900 mb-8 uppercase">Circle Access</h1>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input 
-              type="password"
-              placeholder="Authorization Code"
-              className={`w-full bg-gray-50 border ${authError ? 'border-red-500' : 'border-gray-200'} rounded-2xl px-6 py-4 text-center text-xl font-bold focus:ring-4 focus:ring-blue-100 outline-none transition-all`}
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-            />
-            {authError && <p className="text-red-500 text-xs font-bold uppercase tracking-wider">Invalid Circle Code</p>}
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-              <ShieldCheck size={20} /> Login to Circle
-            </button>
+            <input type="password" placeholder="Authorization Code" className={`w-full bg-gray-50 border ${authError ? 'border-red-500' : 'border-gray-200'} rounded-2xl px-6 py-4 text-center text-xl font-bold outline-none`} value={passcode} onChange={(e) => setPasscode(e.target.value)} />
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2"><ShieldCheck size={20} /> Login</button>
           </form>
         </div>
       </div>
     );
   }
 
-  // --- MAIN APP UI ---
   return (
     <main className="p-4 md:p-10 bg-slate-50 min-h-screen font-sans text-gray-800">
       <div className="max-w-5xl mx-auto bg-white p-6 md:p-12 rounded-[2.5rem] shadow-2xl border border-gray-100">
         
-        {/* Header - DYNAMIC CIRCLE NAME */}
         <div className="flex items-center justify-between border-b pb-8 mb-8">
             <div className="flex items-center gap-6">
                 <div className="w-20 h-20 bg-white flex items-center justify-center rounded-2xl shadow-lg border-4 border-white overflow-hidden shrink-0">
@@ -284,15 +251,31 @@ export default function MinutesApp() {
                     <p className="text-md text-blue-600 font-bold italic">{activeCircle.name}</p>
                 </div>
             </div>
-            <button 
-              onClick={handleLogout}
-              className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest border border-gray-100 px-3 py-1 rounded-lg"
-            >
-                Switch Circle
-            </button>
+            <button onClick={handleLogout} className="text-[10px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest border border-gray-100 px-3 py-1 rounded-lg">Switch Circle</button>
         </div>
 
-        {/* Info Grid */}
+        {/* Meeting Type Selection - Added Above Location */}
+        <div className="mb-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+          <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 block ml-1">Meeting Type</label>
+          <div className="flex flex-wrap gap-4 items-end">
+            <select 
+              className="bg-white border-none rounded-2xl px-5 py-3 shadow-sm h-[52px] min-w-[250px] font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
+              value={meetingType}
+              onChange={e => setMeetingType(e.target.value)}
+            >
+              {["തസ്‌കിയ യോഗം", "ദഅവ യോഗം", "പ്രസ്ഥാന പഠന യോഗം", "സൗഹൃദ യോഗം", "തഹ്‌രീകി യോഗം", "Others"].map(opt => <option key={opt}>{opt}</option>)}
+            </select>
+            {meetingType === 'Others' && (
+              <input 
+                className="flex-1 bg-white border-none rounded-2xl px-5 py-3 shadow-sm h-[52px] outline-none focus:ring-2 focus:ring-orange-400" 
+                placeholder="Specify Meeting Type..." 
+                value={otherMeetingType}
+                onChange={e => setOtherMeetingType(e.target.value)}
+              />
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className="flex flex-col">
             <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 ml-1">Location</label>
@@ -306,6 +289,8 @@ export default function MinutesApp() {
             <TimePicker label="Meeting Start" h={startTime.h} m={startTime.m} p={startTime.p} onChange={(k:any, v:any) => setStartTime({...startTime, [k]: v})} />
           </div>
         </div>
+
+        {/* ... Rest of your component (Attendance, Agenda, etc.) ... */}
 
         {/* Attendance Section - DYNAMIC MEMBERS */}
         <div className="mb-10">
